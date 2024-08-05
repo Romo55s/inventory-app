@@ -7,8 +7,8 @@ import TextCard from "@/components/cards/TextCard";
 export default function Home() {
   const imgInputRef = useRef<HTMLInputElement | null>(null);
   const [processing, setProcessing] = useState<boolean>(false);
-  const [texts, setTexts] = useState<Array<string>>([]);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [texts, setTexts] = useState<string[]>([]); 
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
 
   const openBrowse = () => {
     imgInputRef.current?.click();
@@ -37,7 +37,7 @@ export default function Home() {
     const url = URL.createObjectURL(file);
     console.log("File:", file);
     console.log("URL:", url);
-    setImageUrl(url);
+    setImageUrls(prevUrl => [...prevUrl, url]);
 
     setProcessing(true);
     try {
@@ -50,7 +50,8 @@ export default function Home() {
       });
 
       const data = await response.json();
-      setTexts([data.result]);
+      console.log(data.result); 
+      setTexts(prevTexts => [...prevTexts, data.result]); // Agregar el nuevo resultado al array existente
     } catch (error) {
       console.error('Error processing image:', error);
     } finally {
@@ -93,8 +94,8 @@ export default function Home() {
         </div>
       </div>
       <div className="my-10 md:px-20 px-5">
-        {texts.map((t, i) => (
-          <TextCard key={i} i={i} t={t} imageUrl={imageUrl || ""} />
+        {texts.map((text, index) => (
+          <TextCard key={index} i={index} t={text} imageUrl={imageUrls[index] || ""} />
         ))}
       </div>
     </main>

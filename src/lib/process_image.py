@@ -3,7 +3,7 @@ import sys
 import easyocr
 
 def process_image(image_path):
-    reader = easyocr.Reader(['en'])  # Initialize the reader with English language
+    reader = easyocr.Reader(['en'], gpu=False, verbose=False)  # Initialize the reader with English language and disable verbose
     result = reader.readtext(image_path)
     text = ' '.join([res[1] for res in result])  # Extract text from the result
     return text
