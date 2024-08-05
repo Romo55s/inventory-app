@@ -15,34 +15,32 @@ export default function Home() {
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      console.error("No file selected");
+    const files = e.target.files;
+    if (!files || files.length === 0) {
+      console.error("No files selected");
       return;
     }
-    processFile(file);
+    processFiles(Array.from(files));
   };
 
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (!file) {
-      console.error("No file dropped");
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) {
+      console.error("No files dropped");
       return;
     }
-    processFile(file);
+    processFiles(Array.from(files));
   };
 
-  const processFile = async (file: File) => {
-    const url = URL.createObjectURL(file);
-    console.log("File:", file);
-    console.log("URL:", url);
-    setImageUrls(prevUrl => [...prevUrl, url]);
+  const processFiles = async (files: File[]) => {
+    const urls = files.map(file => URL.createObjectURL(file));
+    setImageUrls(prevUrls => [...prevUrls, ...urls]);
 
     setProcessing(true);
     try {
       const formData = new FormData();
-      formData.append('imagePath', file); // Usa el objeto file directamente
+      files.forEach(file => formData.append('imagePath', file));
 
       const response = await fetch('/api/process-image', {
         method: 'POST',
@@ -50,10 +48,10 @@ export default function Home() {
       });
 
       const data = await response.json();
-      console.log(data.result); 
-      setTexts(prevTexts => [...prevTexts, data.result]); // Agregar el nuevo resultado al array existente
+      console.log(data.results); 
+      setTexts(prevTexts => [...prevTexts, ...data.results]); // Agregar los nuevos resultados al array existente
     } catch (error) {
-      console.error('Error processing image:', error);
+      console.error('Error processing images:', error);
     } finally {
       setProcessing(false);
     }
@@ -72,6 +70,7 @@ export default function Home() {
         hidden
         ref={imgInputRef}
         required
+        multiple
         onChange={handleFileChange}
       />
       <div className="w-full md:px-20 p-5 flex items-center justify-center cursor-pointer">
@@ -84,8 +83,8 @@ export default function Home() {
           <div className="flex items-center justify-center flex-col">
             <p className="text-center text-3xl font-[700] text-slate-700">
               {processing
-                ? "Processing Image ..."
-                : "Browse Or Drop Your Image Here"}
+                ? "Processing Images ..."
+                : "Browse Or Drop Your Images Here"}
             </p>
             <span className="text-[150px] text-slate-700">
               <CiImageOn className={processing ? "animate-pulse" : ""} />

@@ -1,25 +1,14 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import multer from 'multer';
 import path from 'path';
-import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { execFile } from 'child_process';
 
-// Promisify execFile for async/await usage
 const execFileAsync = promisify(execFile);
 
-// Configurar multer para manejar la carga de archivos
 const upload = multer({ dest: 'uploads/' });
+const multerMiddleware = upload.array('imagePath'); // Cambiado a array para múltiples archivos
 
-// Middleware para manejar la carga de archivos con multer
-const multerMiddleware = upload.single('imagePath');
-
-export const config = {
-  api: {
-    bodyParser: false, // Deshabilitar el análisis del cuerpo de la solicitud por defecto
-  },
-};
-
-// Convertir multer a una promesa
 const runMiddleware = (req: NextApiRequest, res: NextApiResponse, fn: Function) => {
   return new Promise((resolve, reject) => {
     fn(req, res, (result: any) => {
@@ -39,33 +28,45 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   try {
     await runMiddleware(req, res, multerMiddleware);
 
-    const file = (req as any).file;
-    if (!file) {
-      return res.status(400).json({ error: 'Image file is required' });
+    const files = (req as any).files;
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'Image files are required' });
     }
 
     const scriptPath = path.join(process.cwd(), 'src', 'lib', 'process_image.py');
-    const filePath = path.join(process.cwd(), file.path);
-
-    // Ruta completa al intérprete de Python en el entorno virtual
     const pythonPath = path.join(process.cwd(), 'venv', 'Scripts', 'python.exe');
 
-    try {
-      const { stdout, stderr } = await execFileAsync(pythonPath, [scriptPath, filePath]);
+    const results = [];
+    for (const file of files) {
+      const filePath = path.join(process.cwd(), file.path);
+      console.log(`Processing file: ${filePath}`); // Log para depuración
+      try {
+        const { stdout, stderr } = await execFileAsync(pythonPath, [scriptPath, filePath]);
 
-      if (stderr) {
-        return res.status(500).json({ error: 'Failed to process image', details: stderr });
+        if (stderr) {
+          console.error(`Error processing file ${filePath}: ${stderr}`); // Log para depuración
+          return res.status(500).json({ error: 'Failed to process image', details: stderr });
+        }
+
+        results.push(stdout.trim());
+      } catch (error) {
+        console.error(`Exception processing file ${filePath}: ${error}`); // Log para depuración
+        return res.status(500).json({ error: 'Failed to process image', details: error });
       }
-
-      res.status(200).json({ result: stdout.trim() });
-    } catch (error) {
-      console.log('Error processing image:', error);
-      res.status(500).json({ error: 'Failed to process image', details: error });
     }
+
+    res.status(200).json({ results });
   } catch (error) {
-    console.log('Error uploading file:', error);
-    res.status(500).json({ error: 'Failed to upload file', details: error });
+    console.error(`Internal server error: ${error}`); // Log para depuración
+    res.status(500).json({ error: 'Internal server error', details: error });
   }
+};
+
+export const config = {
+  api: {
+    bodyParser: false, // Deshabilitar el bodyParser para que multer pueda manejar el formulario
+    sizeLimit: '10mb', // Aumentar el límite de tamaño del cuerpo a 10mb
+  },
 };
 
 export default handler;
