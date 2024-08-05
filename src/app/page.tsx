@@ -1,33 +1,63 @@
 "use client";
 
-import Image from "next/image";
 import { CiImageOn } from "react-icons/ci";
 import { useRef, useState } from "react";
-import convertor from "@/lib/convert";
-import { text } from "stream/consumers";
 import TextCard from "@/components/cards/TextCard";
 
 export default function Home() {
-  const imgInputRef: any = useRef(null);
+  const imgInputRef = useRef<HTMLInputElement | null>(null);
   const [processing, setProcessing] = useState<boolean>(false);
-  const [texts, setText] = useState<Array<string>>([]);
+  const [texts, setTexts] = useState<Array<string>>([]);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
   const openBrowse = () => {
     imgInputRef.current?.click();
   };
-  const convert = async (url: string) => {
-    if (url) {
-      setProcessing(true);
-      await convertor(url).then((text: string) => {
-        if (text) {
-          const copyText = texts;
-          copyText.push(text);
-          setText(copyText);
-          console.log(text);
-        }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      console.error("No file selected");
+      return;
+    }
+    processFile(file);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (!file) {
+      console.error("No file dropped");
+      return;
+    }
+    processFile(file);
+  };
+
+  const processFile = async (file: File) => {
+    const url = URL.createObjectURL(file);
+    console.log("File:", file);
+    console.log("URL:", url);
+    setImageUrl(url);
+
+    setProcessing(true);
+    try {
+      const formData = new FormData();
+      formData.append('imagePath', file); // Usa el objeto file directamente
+
+      const response = await fetch('/api/process-image', {
+        method: 'POST',
+        body: formData,
       });
+
+      const data = await response.json();
+      setTexts([data.result]);
+    } catch (error) {
+      console.error('Error processing image:', error);
+    } finally {
       setProcessing(false);
     }
   };
+
   return (
     <main className="text-white">
       <h2 className="px-5 pt-10 text-center md:text-6xl text-3xl font-[800]">
@@ -41,22 +71,13 @@ export default function Home() {
         hidden
         ref={imgInputRef}
         required
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-          const url: string = URL.createObjectURL(e.target.files![0]);
-          convert(url);
-        }}
+        onChange={handleFileChange}
       />
       <div className="w-full md:px-20 p-5 flex items-center justify-center cursor-pointer">
         <div
           onClick={openBrowse}
-          onDrop={(e: any) => {
-            e.preventDefault();
-            const url: string = URL.createObjectURL(e.dataTransfer.files![0]);
-            convert(url);
-          }}
-          onDragOver={(e: any) => {
-            e.preventDefault();
-          }}
+          onDrop={handleDrop}
+          onDragOver={(e) => e.preventDefault()}
           className="bg-slate-900 min-h-[50vh] w-full p-5 rounded-xl flex items-center justify-center"
         >
           <div className="flex items-center justify-center flex-col">
@@ -72,9 +93,9 @@ export default function Home() {
         </div>
       </div>
       <div className="my-10 md:px-20 px-5">
-        {texts.map((t, i) => {
-          return <TextCard key={i} i={i} t={t} />;
-        })}
+        {texts.map((t, i) => (
+          <TextCard key={i} i={i} t={t} imageUrl={imageUrl || ""} />
+        ))}
       </div>
     </main>
   );
