@@ -1,6 +1,6 @@
 "use client";
 
-import { CiImageOn } from "react-icons/ci";
+import { CiImageOn, CiWarning } from "react-icons/ci";
 import { useRef, useState } from "react";
 import TextCard from "@/components/cards/TextCard";
 
@@ -63,7 +63,7 @@ export default function Home() {
         <div className="flex flex-col w-full md:w-1/2">
           <h2 className="px-5 pt-10 text-center md:text-6xl text-3xl font-[800]">
             Upload the{" "}
-            <span className="bg-gradient-to-r from-blue-500 to-green-500 text-transparent bg-clip-text">
+            <span className="bg-gradient-to-r from-blue-500 to-slate-700 text-transparent bg-clip-text">
               images
             </span>
           </h2>
@@ -80,7 +80,7 @@ export default function Home() {
               onClick={openBrowse}
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
-              className="bg-slate-900 min-h-[50vh] w-full p-5 rounded-xl flex items-center justify-center"
+              className="bg-slate-900 min-h-[60vh] w-full p-5 rounded-xl flex items-center justify-center"
             >
               <div className="flex items-center justify-center flex-col">
                 <p className="text-center text-3xl font-[700] text-slate-700">
@@ -96,15 +96,28 @@ export default function Home() {
           </div>
         </div>
         <div className="w-full md:w-1/2">
-          <div className="my-10 md:px-20 px-5 h-[80vh] overflow-y-auto">
-            {texts.map((text, index) => (
-              <TextCard
-                key={index}
-                i={index}
-                t={text}
-                imageUrl={imageUrls[index] || ""}
-              />
-            ))}
+          <div className="my-16 md:px-20 px-5 h-[80vh] flex items-center justify-center">
+            {texts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center">
+                <span className="text-[100px] text-slate-700 mb-4">
+                  <CiWarning />
+                </span>
+                <p className="text-center text-3xl font-[700] text-slate-700">
+                  No data loaded
+                </p>
+              </div>
+            ) : (
+              <div className="h-[80vh] overflow-y-auto">
+                {texts.map((text, index) => (
+                  <TextCard
+                    key={index}
+                    i={index}
+                    t={text}
+                    imageUrl={imageUrls[index] || ""}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

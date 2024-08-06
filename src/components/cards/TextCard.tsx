@@ -10,9 +10,15 @@ const TextCard = ({
   imageUrl: string;
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(t);
 
   const copyToClipBoard = (text: string) => {
     navigator.clipboard.writeText(text);
+  };
+
+  const updateInput = (text: string) => {
+    setInputValue(text);
+    setIsModalOpen(false);
   };
 
   return (
@@ -48,7 +54,8 @@ const TextCard = ({
           )}
           <input
             className="w-auto p-1 text-sm outline-none bg-gray-800 rounded-md"
-            defaultValue={t}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
             type="text"
           />
         </div>
@@ -56,7 +63,7 @@ const TextCard = ({
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-lg shadow-lg p-6 w-3/4 max-w-8xl">
+          <div className="bg-gray-900 rounded-lg shadow-lg p-6 w-auto">
             <div className="flex justify-between items-center mb-4">
               <p className="text-lg font-semibold">
                 {`(${i + 1}) `}
@@ -79,11 +86,21 @@ const TextCard = ({
                   className="w-[80vh] h-[80vh] rounded-md"
                 />
               )}
-              <input
-                className="w-full p-2 text-lg outline-none bg-gray-800 rounded-md"
-                defaultValue={t}
-                type="text"
-              />
+              <div className="flex flex-col gap-5">
+                <h1 className="text-center text-xl">Update the field</h1>
+                <input
+                  className="w-full p-2 text-lg outline-none bg-gray-800 rounded-md"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  type="text"
+                />
+                <button
+                  onClick={() => updateInput(inputValue)}
+                  className="bg-gray-200 text-black text-xs rounded-md px-3 py-1 transition-all hover:text-white hover:bg-gray-800"
+                >
+                  Update
+                </button>
+              </div>
             </div>
           </div>
         </div>

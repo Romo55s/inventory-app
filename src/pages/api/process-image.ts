@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { promisify } from 'util';
 import { execFile } from 'child_process';
+import fs from 'fs-extra';
 
 const execFileAsync = promisify(execFile);
 
@@ -26,6 +27,10 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   }
 
   try {
+    const uploadsDir = path.join(process.cwd(), 'uploads');
+    await fs.emptyDir(uploadsDir);
+    console.log('Uploads directory cleared');
+
     await runMiddleware(req, res, multerMiddleware);
 
     const files = (req as any).files;
