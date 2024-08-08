@@ -9,6 +9,10 @@ export default function Home() {
   const [processing, setProcessing] = useState<boolean>(false);
   const [texts, setTexts] = useState<string[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [averageProcessingTime, setAverageProcessingTime] = useState<
+    number | null
+  >(null);
+  const [progress, setProgress] = useState<number>(0);
 
   const openBrowse = () => {
     imgInputRef.current?.click();
@@ -38,18 +42,34 @@ export default function Home() {
     setImageUrls((prevUrls) => [...prevUrls, ...urls]);
 
     setProcessing(true);
+    setProgress(0); // Reset progress
     try {
       const formData = new FormData();
-      files.forEach((file) => formData.append("imagePath", file));
+      files.forEach((file) => {
+        console.log("Appending file to formData:", file); // Log para depuración
+        formData.append("imagePath", file);
+      });
 
       const response = await fetch("/api/process-image", {
         method: "POST",
         body: formData,
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
-      console.log(data.results);
-      setTexts((prevTexts) => [...prevTexts, ...data.results]); // Agregar los nuevos resultados al array existente
+      console.log("Response data:", data); // Log para depuración
+
+      // Simulate progress update
+      const totalImages = files.length;
+      data.results.forEach((result: { text: string }, index: number) => {
+        setTexts((prevTexts) => [...prevTexts, result.text]);
+        setProgress(((index + 1) / totalImages) * 100); // Update progress
+      });
+
+      setAverageProcessingTime(data.averageProcessingTime);
     } catch (error) {
       console.error("Error processing images:", error);
     } finally {
@@ -86,11 +106,23 @@ export default function Home() {
                 <p className="text-center text-3xl font-[700] text-slate-700">
                   {processing
                     ? "Processing Images ..."
+                    : averageProcessingTime !== null
+                    ? `Average Processing Time: ${averageProcessingTime.toFixed(
+                        2
+                      )} seconds`
                     : "Browse Or Drop Your Images Here"}
                 </p>
                 <span className="text-[150px] text-slate-700">
                   <CiImageOn className={processing ? "animate-pulse" : ""} />
                 </span>
+                {processing && (
+                  <div className="w-full bg-gray-200 rounded-full h-4 mt-4">
+                    <div
+                      className="bg-blue-600 h-4 rounded-full"
+                      style={{ width: `${progress}%` }}
+                    ></div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -1,13 +1,21 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import multer from 'multer';
 import path from 'path';
-import { promisify } from 'util';
-import { execFile } from 'child_process';
-import fs from 'fs-extra';
+import { spawn } from 'child_process';
+import fs from 'fs';
 
-const execFileAsync = promisify(execFile);
+const storage = multer.diskStorage({
+  destination: 'uploads/',
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${file.fieldname}-${Date.now()}${ext}`);
+  }
+});
 
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // Límite de tamaño de archivo: 10MB
+});
 const multerMiddleware = upload.array('imagePath'); // Cambiado a array para múltiples archivos
 
 const runMiddleware = (req: NextApiRequest, res: NextApiResponse, fn: Function) => {
@@ -21,16 +29,29 @@ const runMiddleware = (req: NextApiRequest, res: NextApiResponse, fn: Function) 
   });
 };
 
+// Function to delete all files in the uploads directory
+const clearUploadsDirectory = () => {
+  const directory = 'uploads/';
+  fs.readdir(directory, (err, files) => {
+    if (err) throw err;
+
+    for (const file of files) {
+      fs.unlink(path.join(directory, file), err => {
+        if (err) throw err;
+      });
+    }
+  });
+};
+
 const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  try {
-    const uploadsDir = path.join(process.cwd(), 'uploads');
-    await fs.emptyDir(uploadsDir);
-    console.log('Uploads directory cleared');
+  // Clear the uploads directory
+  clearUploadsDirectory();
 
+  try {
     await runMiddleware(req, res, multerMiddleware);
 
     const files = (req as any).files;
@@ -40,30 +61,64 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
 
     const scriptPath = path.join(process.cwd(), 'src', 'lib', 'process_image.py');
     const pythonPath = path.join(process.cwd(), 'venv', 'Scripts', 'python.exe');
+    const results: { text: string, processingTime: number }[] = [];
 
-    const results = [];
+    let totalProcessingTime = 0;
+
     for (const file of files) {
-      const filePath = path.join(process.cwd(), file.path);
+      const filePath = file.path;
       console.log(`Processing file: ${filePath}`); // Log para depuración
-      try {
-        const { stdout, stderr } = await execFileAsync(pythonPath, [scriptPath, filePath]);
 
-        if (stderr) {
-          console.error(`Error processing file ${filePath}: ${stderr}`); // Log para depuración
-          return res.status(500).json({ error: 'Failed to process image', details: stderr });
-        }
+      const processingResult = await new Promise<{ text: string, processingTime: number }>((resolve, reject) => {
+        const process = spawn(pythonPath, [scriptPath, filePath]);
 
-        results.push(stdout.trim());
-      } catch (error) {
-        console.error(`Exception processing file ${filePath}: ${error}`); // Log para depuración
-        return res.status(500).json({ error: 'Failed to process image', details: error });
-      }
+        let stdout = '';
+        let stderr = '';
+
+        process.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+
+        process.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        process.on('close', (code) => {
+          if (code !== 0) {
+            return reject(new Error(`Process exited with code ${code}: ${stderr}`));
+          }
+          console.log('stdout:', stdout); // Agregar log para depuración
+          console.log('stderr:', stderr); // Agregar log para depuración
+          try {
+            const output = JSON.parse(stdout);
+            resolve({
+              text: output.text,
+              processingTime: output.processing_time
+            });
+          } catch (error) {
+            reject(new Error('Failed to parse processing result'));
+          }
+        });
+      });
+
+      totalProcessingTime += processingResult.processingTime;
+      results.push(processingResult);
     }
 
-    res.status(200).json({ results });
+    const averageProcessingTime = totalProcessingTime / files.length;
+    const estimatedTotalTime = averageProcessingTime * files.length;
+    console.log(`Average processing time per image: ${averageProcessingTime} seconds`);
+    console.log(`Estimated total processing time: ${estimatedTotalTime} seconds`);
+
+    return res.status(200).json({ 
+      message: 'Images processed successfully', 
+      averageProcessingTime,
+      estimatedTotalTime,
+      results 
+    });
   } catch (error) {
     console.error(`Internal server error: ${error}`); // Log para depuración
-    res.status(500).json({ error: 'Internal server error', details: error });
+    return res.status(500).json({ error: 'Internal server error', details: error });
   }
 };
 
